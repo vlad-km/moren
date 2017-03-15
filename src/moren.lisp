@@ -1,12 +1,22 @@
 ;;; -*- mode:lisp;  coding:utf-8 -*-
 
 
+;;;
+;;; Moren IDE
+;;;
+;;; Copyleft, 2016-2017, mvk
+;;;
+;;;
+
+
 (defparameter div-banner (dom-create "div" (pair '("id" "class") '("banner-id" "tide-banner tide-default-font"))))
 (defparameter div-console (dom-create "div" (pair '("id" "class") '("console-id" "tide-console tide-default-font"))))
-(defparameter div-select (dom-create "div" (pair '("id" "class") '("select-id" "tide-canvas"))))
+(defparameter div-select (dom-create "div" (pair '("id" "class") '("select-id" "tide-canvas unvisible"))))
 (defparameter div-control (dom-create "div" (pair '("id" "class") '("control-tab-id" "tide-control-pad tide-default-font"))))
 
 
+;;; wtf?
+;;;
 (defparameter br-div (dom-create "br"))
 (defparameter space-div (dom-create-text-node "|  |"))
 
@@ -101,12 +111,15 @@
     (#j:localStorage:setItem "jqhist" (#j:JSON:stringify (#j:jqconsole:GetHistory))))
 
 ;;;
-;;; JQ-console history
+;;; Shadow JQ-console history
+;;;
+;;; console history stored in localStorage
+;;;  does not match the entries in the jqconsole  dom structure
 ;;;
 (defparameter tide-jq-history nil)
 
 ;;;
-;;; get console history
+;;; get console history from localStorage and place to array
 ;;;
 ;;; (explore-console-history)
 ;;; => History has 90 items
@@ -124,7 +137,8 @@
         (values)))
 
 ;;;
-;;; look console history
+;;; look console history from to items
+;;;
 ;;;
 ;;; (look-console-history 5 10)
 ;;;
@@ -156,9 +170,12 @@
 
 
 ;;;
-;;; Console history clean button
+;;; Console history reset button
 ;;;
 ;;; Large history of working with the console slow down your browser
+;;; All historic items will be droped from localStorage
+;;;
+;;; Droped localStorage
 ;;;
 (defparameter ctrl-btn-reset-hist
   (dom-create-button "RST"
@@ -172,28 +189,52 @@
                                                   (values))))))
 
 ;;;
-;;; Just type (reset-button-on)
-;;; Press button "RST" - all console history will be deleted
+;;; Just type (rst-btn-on)
+;;; Button RST will be install into panel
 ;;;
-(export '(reset-btn-on))
-(defun reset-btn-on ()
+;;; Press button "RST" - all console history will be deleted
+;;; from localStorage Without recovery
+;;;
+(export '(rst-btn-on))
+(defun rst-btn-on ()
     (dom-mount jscl::div-control ctrl-btn-reset-hist)
     (values))
 
 ;;;
-;;; (reset-btn-off) => button "RST" wil be removed from control pane
-(export '(reset-btn-off))
-(defun reset-btn-off ()
+;;; (rst-btn-off) => button "RST" will be removed from control pane
+(export '(rst-btn-off))
+(defun rst-btn-off ()
     (dom-remove ctrl-btn-reset-hist)
     (values))
 
 
 ;;;
+;;; Integrated rst-btn
+;;;
+;;; (rst-btn :on) => install button RST
+;;; (rst-btn :off) =>remove RST button from pane
+;;;
+;;; if error in cmd, then none
+;;;
+
+(export '(rst-btn))
+(defun rst-btn (cmd)
+    (switch cmd
+        (case :on (dom-mount   div-control ctrl-btn-reset-hist))
+        (case :off (dom-remove ctrl-btn-reset-hist))
+        (values-list nil)))
+
+;;;
 ;;; Reset jqconsole shortcuts
 ;;;
-(export '(reset-jq-shortcuts))
-(defun reset-jq-shortcuts ()
+;;; All keyboars shortcuts are deleted from the jqconsole
+;;;
+
+(export '(rst-console-shortcuts))
+(defun rst-console-shortcuts ()
     (#j:jqconsole:ResetShortcuts))
+
+
 
 
 ;;;
@@ -203,6 +244,7 @@
 (defparameter dom-jq-cleaner-timer nil)
 (defparameter dom-jq-cleaner-run nil)
 
+;;; ;;;todo: Deprecate
 (export '(*dom-jq-clr-classes))
 (defparameter *dom-jq-clr-classes
   (list
@@ -213,6 +255,8 @@
 ;;; call (dom-cleaner (elt *dom-jq-clr-classes N)) for cut jq dom structure
 ;;; for class with name N
 ;;; return the number of deleted items with class from dom-jq-clr-classes
+;;;
+;;;todo: Deprecate
 ;;;
 (export '(dom-cleaner))
 (defun dom-cleaner (&optional (gc-class ".jqconsole-output"))
@@ -229,7 +273,7 @@
         (setf q nil)
         droped))
 
-
+;;;todo: Deprecate
 (export '(dom-cleaner-top))
 (defun dom-cleaner-top ()
     (let ((droped #(0 0 0 0 0))
@@ -243,6 +287,40 @@
         (values)))
 
 
+;;;
+;;; New version of function for DOM console clearing
+;;;
+
+(defun clean-dom-console-childs ()
+    (let* ((jqhist nil)
+           (jqlen nil))
+        ;; Yes, and this allows oget
+        ;; first - take length
+        (setf jqlen (oget #j:jqconsole:$container "0" "childNodes" "0" "childNodes" "length"))
+        ;;(format t "Length ~a~%" jqlen)
+        ;; if the length abowe limit 120 elements, the deletion begins
+        ;; todo: made length as parameter
+        (when (>= jqlen 120)
+            (setf jqhist (oget #j:jqconsole:$container "0" "childNodes" "0" "childNodes"))
+            ;;(format t "History ~a~%" (length jqhist))
+            (loop for idx from 1 to 10
+                  ;; first element (console header) is saved
+                  ;; started with index = 1
+                  ;; Remove item from the dom structure
+                  ;; and niling it in the local array
+                  ;; In the hope that the garbage collector works
+                  do (dom-remove (aref jqhist idx))
+                     (setf (aref jqhist idx) nil))
+            (format t "<font color='green'>CLR 10:~a</font>~%" jqlen)
+            ;; zero local array with other dom els
+            ;; to delete all refernces
+            (loop for idx from 0 below jqlen do (setf (aref jqhist idx) nil))
+            (setf jqhist nil))
+        (value-list nil)))
+
+
+
+#|
 (defun dom-jq-cleaner-switch ()
     (cond (dom-jq-cleaner-run
            (#j:window:clearTimeout dom-jq-cleaner-timer)
@@ -254,11 +332,30 @@
            (banner-msg 4 (format nil "<br>CLR ON"))))
     (values))
 
+|#
+
+;;;
+;;; Button switcher on/off
+;;;
+(defun dom-jq-cleaner-switch ()
+    (cond (dom-jq-cleaner-run
+           (#j:window:clearTimeout dom-jq-cleaner-timer)
+           (setf dom-jq-cleaner-run nil)
+           (banner-msg 4 (format nil "<br>CLR OFF")))
+          (t
+           (setf dom-jq-cleaner-timer (#j:window:setInterval #'clean-dom-console-childs 10000))
+           (setf dom-jq-cleaner-run t)
+           (banner-msg 4 (format nil "<br>CLR ON"))))
+    (values))
+
+
 
 (defun dom-jq-cleaner-stop ()
     (#j:window:clearTimeout dom-jq-cleaner-timer))
 
-
+;;;
+;;; Some button CLR
+;;;
 (defparameter ctrl-btn-jq-dom-clr
   (dom-create-button "CLR"
                      (pair '("id" "class" )
@@ -293,6 +390,25 @@
     (values))
 
 
+;;;
+;;; Integrated clr-btn
+;;;
+;;; (clr-btn :on) => install button CLR
+;;; (clr-btn :off) =>remove CLR button from pane
+;;;
+;;; if error in cmd, then none
+;;;
+
+(export '(clr-btn))
+(defun clr-btn (cmd)
+    (switch cmd
+        (case :on (dom-mount jscl::div-control ctrl-btn-jq-dom-clr))
+        (case :off
+          (when dom-jq-cleaner-run
+              (#j:window:clearTimeout dom-jq-cleaner-timer)
+              (setf dom-jq-cleaner-run nil))
+          (dom-remove ctrl-btn-jq-dom-clr)))
+    (values-list nil))
 
 
 ;;;
@@ -367,7 +483,9 @@
 ;;; TODO: remove
 ;;;
 (defun %%export ()
-    (export '(new oget concat def!struct join)))
+    (export '(new oget concat def!struct join make-new fset) )
+    (fset 'console-log #j:console:log) )
+
 
 (defun tide-go ()
     (let* ((jq))
