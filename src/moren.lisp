@@ -169,6 +169,7 @@
         (values) ))
 
 
+
 ;;;
 ;;; Console history reset button
 ;;;
@@ -219,10 +220,10 @@
 
 (export '(rst-btn))
 (defun rst-btn (cmd)
-    (switch cmd
-        (case :on (dom-mount   div-control ctrl-btn-reset-hist))
-        (case :off (dom-remove ctrl-btn-reset-hist))
-        (values-list nil)))
+    (case cmd
+      (:on (dom-mount   div-control ctrl-btn-reset-hist))
+      (:off (dom-remove ctrl-btn-reset-hist))
+      (values-list nil)))
 
 ;;;
 ;;; Reset jqconsole shortcuts
@@ -249,6 +250,7 @@
 (defparameter *dom-jq-clr-classes
   (list
    ".jqconsole-output" ".jqconsole-prompt" ".jqconsole-old-prompt" ".jqconsole-error" ".jqconsole-return"))
+
 
 
 ;;;
@@ -401,13 +403,13 @@
 
 (export '(clr-btn))
 (defun clr-btn (cmd)
-    (switch cmd
-        (case :on (dom-mount jscl::div-control ctrl-btn-jq-dom-clr))
-        (case :off
-          (when dom-jq-cleaner-run
-              (#j:window:clearTimeout dom-jq-cleaner-timer)
-              (setf dom-jq-cleaner-run nil))
-          (dom-remove ctrl-btn-jq-dom-clr)))
+    (case cmd
+      (:on (dom-mount jscl::div-control ctrl-btn-jq-dom-clr))
+      (:off
+       (when dom-jq-cleaner-run
+           (#j:window:clearTimeout dom-jq-cleaner-timer)
+           (setf dom-jq-cleaner-run nil))
+       (dom-remove ctrl-btn-jq-dom-clr)))
     (values-list nil))
 
 
